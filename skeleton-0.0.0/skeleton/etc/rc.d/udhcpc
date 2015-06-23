@@ -1,0 +1,9 @@
+#!/bin/sh
+case $1 in
+ start) /sbin/udhcpc
+        ;;
+  stop) /sbin/killall udhcpc
+        ;;
+     *) echo "udhcpc [start|stop]"
+        ;;
+esac

@@ -1,0 +1,19 @@
+# Statix pkg
+
+# skeleton-0.0.0
+# Fri Jun 19 11:01:05 CDT 2015
+
+DESTDIR=/ 
+
+
+
+installd()
+{
+	mkdir -p "$DESTDIR"
+	cp -r skeleton/* "$DESTDIR" 
+}
+removed()
+{ 
+	echo "error: can not remove the system skeleton"
+}
+

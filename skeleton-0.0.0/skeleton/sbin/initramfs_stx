@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# a simple initramfs
+# (C) 2014, "initramfs_stx", cgraf
+
+
+NEWINIT="/init"
+ROOTDEV="/dev/sda" 
+CHROOTD="/mnt" 
+
+
+
+
+mount -t proc proc /proc
+mount -o remount,rw / 
+
+. /proc/cmdline 2>/dev/null 
+
+mount "${ROOTDEV}" "${CHROOTD}"
+
+
+# Handle user requested mounts if they exist
+[ -e "${BOOTPRT}" ] && mount "${BOOTPRT}" "${CHROOTD}/boot" 
+[ -e "${HOMPART}" ] && mount "${HOMPART}" "${CHROOTD}/home" 
+[ -e "${VARPART}" ] && mount "${VARPART}" "${CHROOTD}/var" 
+[ -e "${USRPART}" ] && mount "${USRPART}" "${CHROOTD}/usr" 
+[ -e "${ETCPART}" ] && mount "${ETCPART}" "${CHROOTD}/etc" 
+[ -e "${BINPART}" ] && mount "${BINPART}" "${CHROOTD}/bin" 
+[ -e "${SBINPRT}" ] && mount "${SBINPRT}" "${CHROOTD}/sbin" 
+[ -e "${OPTPART}" ] && mount "${OPTPART}" "${CHROOTD}/opt" 
+
+
+
+
+mount --move /proc  "${CHROOTD}/proc"
+mount --move /dev   "${CHROOTD}/dev" 
+
+exec /sbin/chroot "${CHROOTD}"  sh -c "exec "$NEWINIT""
+
+# Drop to shell if all else fails.
+exec sh
+

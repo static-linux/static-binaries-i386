@@ -1,0 +1,9 @@
+#!/bin/sh
+case $1 in
+ start) /sbin/klogd
+        ;;
+  stop) /sbin/killall klogd
+        ;;
+     *) echo "klogd [start|stop]"
+        ;;
+esac

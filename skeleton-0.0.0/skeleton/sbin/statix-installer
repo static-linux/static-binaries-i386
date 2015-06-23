@@ -1,0 +1,948 @@
+#!/bin/sh
+
+# (C) 2014, statix-installer, cgraf 
+
+# busybox / dash compliance
+# remove this line if you are using dash
+#alias echo="echo -e" 
+
+
+
+WORKD="$(pwd)"
+[ -e "${WORKD}/tools/statix-installer.conf" ] && . "${WORKD}/tools/statix-installer.conf" 
+[ -e  /etc/statix-installer.conf ] && . /etc/statix-installer.conf
+[ -e  "${WORKD}/statix-installer.conf" ] && . "${WORKD}/statix-installer.conf"
+
+
+red="\033[31m"
+gre="\033[32m"
+gol="\033[33m"
+blu="\033[34m"
+pur="\033[35m"
+tea="\033[36m"
+nor="\033[39m"
+
+# subroutines
+center()
+{
+xw="61"
+xh="30"
+tw(){ th="${1}" tw="${2}";}
+tw $(stty size) 
+d="$(( ( $tw / 2 ) - ( $xw / 2 ) -1 ))"  
+i="0"
+r="$( while [ "$i" -lt "$d" ] ; do i="$(( $i + 1 ))" ; echo -n " " ; done)"
+}
+
+# Make sure the terminal dimensions are adequete
+if [ "$tw" -lt "$xw" -o "$th" -lt "$xh" ]
+then echo "error: Terminal must be at least ${xh} x ${xw}."
+     exit 1
+fi
+
+
+next()
+{ 
+[ "$resset" -lt "${counter}" ] && counter="0"
+export "s${counter}"=""
+counter="$(( $counter + 1 ))"
+export "s${counter}"="x" 
+}
+
+userval()
+{
+if [ "${1}" = "X" ]
+then instrct
+     errarea
+     errclos
+     echo -n "$r New value: " 
+     read "${2}"
+     export "s${counter}"="" 
+     "$3"
+     break
+fi
+}
+# End of subroutines
+
+
+# screen drawing functions
+sayhi(){
+   center
+   clear
+   echo -n $gre
+   echo
+   echo "$r.-----------------------------------------------------------." 
+   echo "$r                      ${DISTRO}-installer" 
+   echo "$r'-----------------------------------------------------------'" 
+   echo
+}
+instrct(){
+   echo "$r   If this is unacceptable, please redefine the overrides"
+   echo -n $nor 
+   echo "$r   "x" selects an option."
+   echo "$r   "c" continues to the next screen."
+   echo -n $gre
+   echo "$r   commands avail:  back  exit  sh"
+}
+
+errarea(){
+   echo -n $gre
+   echo "$r.-----------------------------------------------------------."
+}
+promptu(){
+   echo -n $nor
+   echo -n "$r   #>> "
+}
+errclos(){
+   echo "$r'-----------------------------------------------------------'" 
+}
+askuser(){
+
+   read USERCHOICE
+   case "$USERCHOICE" in
+        c) break
+           ;;
+     *=* ) export "$USERCHOICE"
+           ;;
+       sh) sh ;;
+     exit) exit ;; 
+     back) sequence
+           break
+           ;;
+        x) export "s${counter}"="X" ;;
+         
+        *) next ;;
+   esac
+}
+# end of scn drwng fnctns
+
+
+# page blank
+########################################################## 
+
+pageblank()
+{ 
+while [ 1 ]
+do sayhi 
+   echo "$r\t[${s1}] $foo\t[${s2}] $thar\t[${s3}]\t[${s4}]"
+   echo
+   echo "$r\t[${s4}]\t[${s5}]\t[${s6}]\t[${s7}]"
+   echo
+   echo "$r\t[${s8}]\t[${s9}]\t[${s10}]\t[${s11}]"
+   resset="11" 
+   userval $s1 foo page1 
+   userval $s2 thar page1 
+   instrct
+   errarea
+   errclos
+   promptu
+   askuser
+done
+}
+
+
+
+# page 3   option to start sshd
+########################################################## 
+page3()
+{
+while [ 1 ]
+do sayhi
+   echo "$r   By default the ${DISTRO}-installer does not open"
+   echo "$r   an sshd daemon"
+
+   echo "$r   If you would like to operate the installer remotely"
+   echo "$r   select the check box with 'x' and type 'yes'."
+   echo
+   echo "$r   Ssh to installer:\t[${s1}] ${SSHTO}" 
+   echo 
+   resset="2"
+   userval $s1 SSHTO page3
+   #userval $s2  page2
+   instrct
+   errarea
+   case "${SSHTO}" in
+   y|Y|yes|Yes|YES) 
+   if [ -e  /etc/rc.d/sshd ]
+   then /etc/rc.d/sshd  start
+   else service sshd start
+   fi
+   ;;
+   esac
+   errclos
+   promptu
+   askuser
+done
+}
+
+
+
+# page 4   automatically detect and allow selection of disks
+####################################################################### 
+page4()
+{
+  dmessage()
+  {
+  [ -b "${1}" ] && \
+  dmesg | grep -o $(echo "${1}" | sed 's|.*/||').*| awk 'NR==1' | grep -o '(.*' 
+  }
+
+while [ 1 ]
+do sayhi 
+
+   echo "$r   The available block devices are:" 
+   for i in $(find /dev/sd[a-z] )
+   do if [ -b "$i" ]
+      then echo -n "$r     $i  " 
+           
+           dmessage ${i}
+      fi
+   done
+   echo 
+
+   if ! [ "$PAGE4FR" = "0" ]
+   then COUNTER=0
+        for i in $(find /dev/sd[a-z] )
+        do COUNTER=$(( $COUNTER + 1 ))
+           if [ -b "$i" ]
+           then export "DEVI${COUNTER}"="${i}"
+           fi
+        done 
+        export PAGE4FR="0"
+   fi 
+ 
+   echo "$r   Define device(s) to be used:"
+   echo "$r   The only valid values are block devices or 'none'"
+   echo 
+   if [ -b "${DEVI1}" -o "${DEVI1RN}" = "0" ] ; then
+   echo -n "$r    Device1:\t[${s1}]\t${DEVI1} " ; dmessage "${DEVI1}"
+   echo 
+   export DEVI1RN=0
+   fi
+   if [ -b "${DEVI2}" -o "${DEVI2RN}" = "0" ] ; then
+   echo -n "$r    Device2:\t[${s2}]\t${DEVI2} " ; dmessage "${DEVI2}"
+   echo 
+   export DEVI2RN=0
+   fi
+   if [ -b "${DEVI3}" -o "${DEVI3RN}" = "0" ] ; then
+   echo -n "$r    Device3:\t[${s3}]\t${DEVI3} " ; dmessage "${DEVI3}"
+   echo
+   export DEVI3RN=0
+   fi
+   
+   resset="3"
+   userval $s1 DEVI1 page4
+   userval $s2 DEVI2 page4
+   userval $s3 DEVI3 page4
+   
+   instrct
+   errarea 
+
+   if ! [ -b "${DEVI1}" ]
+   then [ "${DEVI1}" = "none" ] || echo "$r ${DEVI1} is not a block device"
+        export DEVI1="none"
+   fi
+   if ! [ -b "${DEVI2}" ]
+   then [ "${DEVI2}" = "none" ] || echo "$r ${DEVI2} is not a block device"
+        export DEVI2="none"
+   fi
+   if ! [ -b "${DEVI3}" ] 
+   then [ "${DEVI3}" = "none" ] || echo "$r ${DEVI3} is not a block device" 
+        export DEVI3="none" 
+   fi 
+  
+   if [ "${DEVI1}" = "${DEVI2}" -a "${DEVI1}" != "none" ] 
+   then echo "$r Error: It appears you are attempting to operate on the"
+        echo "$r same device multiple times."
+        export DEVI2="none"
+   fi
+   if [ "${DEVI2}" = "${DEVI3}" -a "${DEVI2}" != "none" ]
+   then echo "$r Error: It appears you are attempting to operate on the"
+        echo "$r same device multiple times."
+        export DEVI3="none"
+   fi
+   if [ "${DEVI1}" = "${DEVI3}" -a "${DEVI1}" != "none" ]
+   then echo "$r Error: It appears you are attempting to operate on the"
+        echo "$r same device multiple times."
+        export DEVI3="none"
+   fi 
+   errclos
+   promptu
+   askuser
+done 
+}
+
+# page 5   dicuss options for partitioning and formatting  
+####################################################################
+page5()
+{
+while [ 1 ]
+do sayhi 
+   resset="18" 
+   echo "$r  ${DEVI1}\tcan be devided into four parts:" 
+   echo "$r  part:\tstart:\tend:\t\t fs\t\t mnt:"
+   echo "$r  ${DEVI1}1\t[${s1}] ${A1}%\t[${s2}] ${AUP1}%\t[${s3}] ${AFS1}\t[${s4}] ${AMT1}" 
+   echo "$r  ${DEVI1}2\t[${s5}] ${B1}%\t[${s6}] ${BUP1}%\t[${s7}] ${BFS1}\t[${s8}] ${BMT1}" 
+   echo "$r  ${DEVI1}3\t[${s9}] ${C1}%\t[${s10}] ${CUP1}%\t[${s11}] ${CFS1}\t[${s12}] ${CMT1}" 
+   echo "$r  ${DEVI1}4\t[${s13}] ${D1}%\t[${s14}] ${ENDD1}%\t[${s15}] ${DFS1}\t[${s16}] ${DMT1}" 
+   if [ "$EXPAND2" != "YES" -a "$EXPAND3" != "YES" ]
+   then echo "$r   Set Boot flag on [${s17}] ${BOOTDEV1}\t"
+   fi
+
+
+   if [ -b ${DEVI2} ]
+   then
+   echo
+   echo "$r  ${DEVI2}\tFormat this partition  y/n [${s18}] "$EXPAND2" " 
+   case  "$EXPAND2" in
+   y|Y|yes|Yes|YES) 
+   EXPAND2="YES" 
+   resset="36"
+   echo "$r  ${DEVI2}\tcan be devided into four parts:" 
+   echo "$r  part:\tstart:\tend:\t\t fs\t\t mnt:"
+   echo "$r  ${DEVI2}1\t[${s19}] ${A2}%\t[${s20}] ${AUP2}%\t[${s21}] ${AFS2}\t[${s22}] ${AMT2}"   
+   echo "$r  ${DEVI2}2\t[${s23}] ${B2}%\t[${s24}] ${BUP2}%\t[${s25}] ${BFS2}\t[${s26}] ${BMT2}"
+   echo "$r  ${DEVI2}3\t[${s27}] ${C2}%\t[${s28}] ${CUP2}%\t[${s29}] ${CFS2}\t[${s30}] ${CMT2}"
+   echo "$r  ${DEVI2}4\t[${s31}] ${D2}%\t[${s32}] ${ENDD2}% \t[${s33}] ${DFS2}\t[${s34}] ${DMT2}"
+   if [ "$EXPAND3" != "YES" ]
+   then echo "$r   Set Boot flag on [${s35}] ${BOOTDEV1}\t"
+   fi
+   ;;
+   esac
+   fi
+
+   
+   if [ -b ${DEVI3} ]
+   then 
+   echo
+   echo "$r  ${DEVI2}\tFormat this partition  y/n [${s17}] "$EXPAND2" " 
+   case  "$EXPAND2" in
+   y|Y|yes|Yes|YES) EXPAND3="YES"
+   resset="52"
+   echo "$r  ${DEVI3}\tcan be devided into four parts:"
+   echo "$r  part:\tstart:\tend:\t\t fs\t\t mnt:"
+   echo "$r  ${DEVI3}1\t[${s37}] ${A3}%\t[${s38}] ${AUP3}%\t[${s39}] ${AFS3}\t[${s40}] ${AMT3}" 
+   echo "$r  ${DEVI3}2\t[${s41}] ${B3}%\t[${s42}] ${BUP3}%\t[${s43}] ${BFS3}\t[${s44}] ${BMT3}" 
+   echo "$r  ${DEVI3}3\t[${s45}] ${C3}%\t[${s46}] ${CUP3}%\t[${s47}] ${CFS3}\t[${s48}] ${CMT3}"
+   echo "$r  ${DEVI3}4\t[${s49}] ${D3}%\t[${s50}] ${ENDD3}% \t[${s51}] ${DFS3}\t[${s52}] ${DMT3}"
+   echo 
+   echo "$r   Set Boot flag on: [${s}] ${BOOTDEV1}\t" 
+   esac
+   fi
+   
+
+   userval $s1  A1    page5
+   userval $s2  AUP1  page5
+   userval $s3  AFS1  page5
+   userval $s4  AMT1  page5
+   userval $s5  B1    page5
+   userval $s6  BUP1  page5
+   userval $s7  BFS1  page5
+   userval $s8  BMT1  page5
+   userval $s9  C1    page5
+   userval $s10 CUP1  page5
+   userval $s11 CFS1  page5
+   userval $s12 CMT1  page5
+   userval $s13 D1    page5
+   userval $s14 ENDD1 page5
+   userval $s15 DFS1  page5
+   userval $s16 DMT1  page5 
+   userval $s17 BOOTDEV1 page5 
+
+   userval $s18 EXPAND2  page5 
+   userval $s19 A2    page5 
+   userval $s20 AUP2  page5
+   userval $s21 AFS2  page5
+   userval $s22 AMT2  page5
+   userval $s23 B2    page5
+   userval $s24 BUP2  page5
+   userval $s25 BFS2  page5
+   userval $s26 BMT2  page5
+   userval $s27 C2    page5
+   userval $s28 CUP2  page5
+   userval $s29 CFS2  page5
+   userval $s30 CMT2  page5
+   userval $s31 D2    page5
+   userval $s32 ENDD2 page5
+   userval $s33 DFS2  page5
+   userval $s34 DMT2  page5
+   userval $s35 BOOTDEV1 page5
+   
+   userval $s36 A3    page5
+   userval $s37 AUP3  page5
+   userval $s38 AFS3  page5
+   userval $s39 AMT3  page5
+   userval $s40 40B3  page5
+   userval $s41 BUP3  page5
+   userval $s42 BFS3  page5
+   userval $s43 BMT3  page5
+   userval $s44 C3    page5
+   userval $s45 CUP3  page5
+   userval $s46 CFS3  page5
+   userval $s47 CMT3  page5
+   userval $s48 D3    page5
+   userval $s49 ENDD3 page5
+   userval $s50 DFS3  page5
+   userval $s51 DMT3  page5
+   userval $s52 BOOTDEV1 page5 
+
+   instrct
+   errarea
+   errclos
+   promptu
+   askuser
+done
+} 
+
+# page 6  discuss and allow of override of fstab
+####################################################################
+
+page6()
+{
+while [ 1 ]
+do sayhi
+   echo "$r   Test fstab" 
+   echo 
+   echo "$r   The following output will be generated as an /etc/fstab  "
+   echo "$r   based on the options you have selected."
+   if [ "$PAGE6RN" != "YES" ] ; then
+   p1="${DEVI1}1"
+   p2="${DEVI1}2"
+   p3="${DEVI1}3"
+   p4="${DEVI1}4"
+
+   p5="${DEVI2}1"
+   p6="${DEVI2}2"
+   p6="${DEVI2}3"
+   p8="${DEVI1}4"
+
+   p9="${DEVI3}1"
+   p10="${DEVI2}2"
+   p11="${DEVI3}3"
+   p12="${DEVI3}4"
+   PAGE6RN="YES"
+   fi
+
+   resset=20
+   echo -n "$r      "
+   echo "[${s1}] ${p1}\t[${s2}] ${AMT1}  \t[${s3}] ${AFS1}\t[${s4}] ${AOP1}\t[${s}] ${ADP1}"
+   echo -n "$r      "
+   echo "[${s6}] ${p2}\t[${s7}] ${BMT1}  \t[${s8}] ${BFS1}\t[${s9}] ${BOP1}\t[${s10}] ${BDP1}"
+   echo -n "$r      "
+   echo "[${s11}] ${p3}\t[${s12}] ${CMT1}  \t[${s13}] ${CFS1}\t[${s14}] ${COP1}\t[${s15}] ${CDP1}" 
+   echo -n "$r      "
+   echo "[${s16}] ${p4}\t[${s17}] ${DMT1}  \t[${s18}] ${DFS1}\t[${s19}] ${DOP1}\t[${s20}] ${DDP1}"
+   echo
+   
+   if [ "$EXPAND2" = "YES" ] ; then
+   resset=40
+   echo -n "$r      "
+   echo "[${s21}] ${p5}\t[${s22}] ${AMT2}\t[${s23}] ${AFS2}\t[${s24}] ${AOP2}\t[${s25}] ${ADP2}"
+   echo -n "$r      "
+   echo "[${s26}] ${p6}\t[${s27}] ${BMT2}\t[${s28}] ${BFS2}\t[${s29}] ${BOP2}\t[${s30}] ${BDP2}"
+   echo -n "$r      "
+   echo "[${s31}] ${p7}\t[${s32}] ${CMT2}\t[${s33}] ${CFS2}\t[${s34}] ${COP2}\t[${s35}] ${CDP2}" 
+   echo -n "$r      "
+   echo "[${s36}] ${p8}\t[${s37}] ${DMT2}\t[${s38}] ${DFS2}\t[${s39}] ${DOP2}\t[${s40}] ${DDP2}"
+   echo
+   
+   fi
+
+   if [ "$EXPAND3" = "YES" ] ; then
+   resset=60
+   echo -n "$r      "
+   echo "[${s41}] ${p9}\t[${s42}] ${AMT3}\t[${s43}] ${AFS3}\t[${s44}] ${AOP3}\t[${s45}] ${ADP3}"
+   echo -n "$r      "
+   echo "[${s46}] ${p10}\t[${s47}] ${BMT3}\t[${s48}] ${BFS3}\t[${s49}] ${BOP3}\t[${s50}] ${BDP3}"
+   echo -n "$r      "
+   echo "[${s51}] ${p11}\t[${s52}] ${CMT3}\t[${s53}] ${CFS3}\t[${s54}] ${COP3}\t[${s55}] ${CDP3}" 
+   echo -n "$r      "
+   echo "[${s56}] ${p12}\t[${s57}] ${DMT3}\t[${s58}] ${DFS3}\t[${s59}] ${DOP3}\t[${s60}] ${DDP3}"
+   echo 
+   fi
+
+
+   userval $s1  p1    page6 
+   userval $s2  AMT1  page6
+   userval $s3  AFS1  page6
+   userval $s4  AOP1  page6
+   userval $s5  ADP1  page6 
+
+   userval $s6  p2    page6 
+   userval $s7  BMT1  page6
+   userval $s8  BFS1  page6
+   userval $s9  BOP1  page6
+   userval $s10 BDP1  page6 
+
+   userval $s11 p3    page6 
+   userval $s12 CMT1  page6
+   userval $s13 CFS1  page6
+   userval $s14 COP1  page6
+   userval $s15 CDP1  page6 
+
+   userval $s16 p4    page6 
+   userval $s17 DMT1  page6
+   userval $s18 DFS1  page6
+   userval $s19 DOP1  page6
+   userval $s20 DDP1  page6
+
+
+   userval $s21 p5    page6 
+   userval $s22 AMT2  page6
+   userval $s23 AFS2  page6
+   userval $s24 AOP2  page6
+   userval $s25 ADP2  page6 
+
+   userval $s26 p6    page6 
+   userval $s27 BMT2  page6
+   userval $s28 BFS2  page6
+   userval $s29 BOP2  page6
+   userval $s30 BDP2  page6 
+
+   userval $s31 p7    page6
+   userval $s32 CMT2  page6
+   userval $s33 CFS2  page6
+   userval $s34 COP2  page6
+   userval $s35 CDP2  page6 
+
+   userval $s36 p8    page6
+   userval $s37 DMT2  page6
+   userval $s38 DFS2  page6
+   userval $s39 DOP2  page6
+   userval $s40 DDP2  page6
+
+
+   userval $s41 p9    page6
+   userval $s42 AMT3  page6
+   userval $s43 AFS3  page6
+   userval $s44 AOP3  page6
+   userval $s45 ADP3  page6
+
+   userval $s46 p10   page6
+   userval $s47 BMT3  page6
+   userval $s48 BFS3  page6
+   userval $s49 BOP3  page6
+   userval $s50 BDP3  page6
+
+   userval $s51 p11   page6
+   userval $s52 CMT3  page6
+   userval $s53 CFS3  page6
+   userval $s54 COP3  page6
+   userval $s55 CDP3  page6 
+
+   userval $s56 p12   page6
+   userval $s57 DMT3  page6
+   userval $s58 DFS3  page6
+   userval $s59 DOP3  page6
+   userval $s60 DDP3  page6
+
+
+   instrct 
+   errarea
+   errclos
+   promptu
+   askuser
+done
+}
+# Page 7  Confirm directory to bootstrap
+##########################################################
+page7()
+{
+
+while [ 1 ]
+do sayhi
+   echo "$r   A location must be supplied for the installer to"
+   echo "$r   bootstrap an installation from."
+   echo 
+   echo "$r   The directory currently selected is:\t${SOURC}"
+   echo "$r   override [${s1}] "
+   echo 
+   resset=1
+   userval $s1 SOURC page7
+   instrct
+   errarea
+   errclos
+   promptu
+   askuser
+done
+}
+
+# page 8  discuss kernel with user
+##########################################################
+page8()
+{
+
+while [ 1 ]
+do sayhi
+   #echo "looks like the kernel command line contains:"
+   for i in `cat /proc/cmdline`
+   do export "$i"
+   done
+   echo "$r   Potential kernels located in the ${SOURC}boot SOURC dir are:" 
+   echo
+   echo "$r "$( ls "${SOURC}boot/"bz* 2>/dev/null )"" 2>/dev/null
+   echo "$r "$( ls "${SOURC}boot/"vm* 2>/dev/null )"" 2>/dev/null
+   echo "$r "$( ls "${SOURC}boot/"zI* 2>/dev/null )"" 2>/dev/null
+   echo
+   echo
+   echo "$r   The following kernel image should look correct: "
+   if [ -e "$KERN" ]
+   then echo "$r \t\t ${KERN}"
+   else echo "$r \t\t ${BOOT_IMAGE}"
+        KERN="${BOOT_IMAGE}"
+  
+   fi
+   echo "$r   override [${s1}]"
+   echo
+   echo -n "$r   Kernel name: "
+   echo "$(echo $KERN | sed 's|.*/||' )"
+   KNAME="$(echo $KERN | sed 's|.*/||' )"
+   echo
+   echo "$r   Kernel must be a valid file or override will not set"
+   echo
+   echo
+   resset=1
+   
+   userval $s1 KERN page8
+   instrct
+   errarea 
+ 
+  
+   
+   errclos
+   promptu
+   askuser
+done
+}
+
+page9()
+{
+
+while [ 1 ]
+do sayhi
+   echo "$r   This screen is a stub and is not complete."
+   echo "$r   The services to be installed are:"
+   echo "$r   Service:\tssh\t${SSHD} [${s1}]" 
+   echo 
+   echo "$r   Service:\thttpd\t${HTTP} [${s2}]" 
+   echo
+   echo "$r   Service:\tcrond\t${CRON} [${s3}]"
+   resset=3
+   echo
+   echo "$r   Valid answers are 'yes' or 'no'"
+   echo
+   case ${SSHD} in
+   y|Y|yes|YES|Yes)  SSHD="yes" ;;
+   *)     SSHD="NO"  ;;
+   esac
+   case ${HTTP} in
+   y|Y|yes|YES|Yes)  HTTP="yes" ;;
+   *)     HTTP="NO"  ;;
+   esac
+   case ${CRON} in
+   y|Y|yes|YES|Yes)  CRON="yes" ;;
+   *)     CRON="NO"  ;;
+   esac
+
+
+   userval $s1 SSHD page9
+   userval $s2 HTTP page9
+   userval $s3 CRON page9
+   instrct
+   errarea
+   
+   errclos
+   promptu
+   askuser
+done
+}
+
+# page 10  Allow user to override busybox location
+##########################################################
+page10()
+{
+
+while [ 1 ]
+do sayhi
+   echo "$r   The busybox located in the ${SOURC}bin SOURC dir is:" 
+   [ -e "${BBBOX}" ] || BBBOX="${SOURC}bin/busybox"
+   echo
+   echo -n "$r   Busybox:"
+   echo "\t ${BBBOX}" 
+   echo "$r   override [${s1}]"
+   echo 
+   echo
+   resset=1
+
+   userval $s1 BBBOX page10
+   instrct
+   errarea
+   errclos
+   promptu
+   askuser
+done
+}
+page11()
+{
+
+while [ 1 ]
+do sayhi 
+   echo
+   echo "$r   This is the final page before the disk(s) are"
+   echo "$r   operated on."
+   echo
+   echo "$r   If all variables are adjusted to desired settings"
+   echo "$r   press 'c' and then 'Enter' to continue." 
+   echo
+   instrct
+   errarea
+   errclos
+   promptu
+   askuser
+done
+}
+
+
+sequence()
+{
+page1 
+page2
+page3
+page4
+page5
+page6
+page7
+page8
+page9
+page10
+page11
+}
+
+
+#sequence
+
+fstabpart()
+{  
+   echo "# Automatically generated at install time" > fstab
+   echo "${p1}\t${AMT1}\t${AFS1}\t${AOP1}\t${ADP1}" >> fstab
+   echo "${p2}\t${BMT1}\t${BFS1}\t${BOP1}\t${BDP1}" >> fstab
+   echo "${p3}\t${CMT1}\t${CFS1}\t${COP1}\t${CDP1}" >> fstab
+   echo "${p4}\t${DMT1}\t${DFS1}\t${DOP1}\t${DDP1}" >> fstab
+   echo
+
+   if [ "$EXPAND2" = "YES" ] ; then 
+   echo "${p5}\t${AMT2}\t${AFS2}\t${AOP2}\t${ADP2}" >> fstab
+   echo "${p6}\t${BMT2}\t${BFS2}\t${BOP2}\t${BDP2}" >> fstab
+   echo "${p7}\t${CMT2}\t${CFS2}\t${COP2}\t${CDP2}" >> fstab
+   echo "${p8}\t${DMT2}\t${DFS2}\t${DOP2}\t${DDP2}" >> fstab
+   echo 
+   fi
+
+   if [ "$EXPAND3" = "YES" ] ; then 
+   echo "${p9}\t${AMT3}\t${AFS3}\t${AOP3}\t${ADP3}" >> fstab
+   echo "${p10}\t${BMT3}\t${BFS3}\t${BOP3}\t${BDP3}" >> fstab
+   echo "${p11}\t${CMT3}\t${CFS3}\t${COP3}\t${CDP3}" >> fstab
+   echo "${p12}\t${DMT3}\t${DFS3}\t${DOP3}\t${DDP3}" >> fstab
+   fi
+   echo "# End of automatically generated fstab" >> fstab
+
+}
+fstabpart
+
+partedpart()
+{
+
+# make partition label 
+./parted "${DEVI1}" mklabel "${LABEL1}" -s -m 
+
+# partition device 1 
+./parted "${DEVI1}" mkpart "${ATP1}" -a optimal -s -m "${A1}%"  "${AUP1}%"
+./parted "${DEVI1}" mkpart "${BTP1}" -a optimal -s -m "${B1}%"  "${BUP1}%"
+./parted "${DEVI1}" mkpart "${CTP1}" -a optimal -s -m "${C1}%"  "${CUP1}%"
+./parted "${DEVI1}" mkpart "${DTP1}" -a optimal -s -m "${D1}%"  "${ENDD1}%"
+
+
+# partition device 2
+if [ "$EXPAND2" = "YES" ] ; then
+./parted "${DEVI2}" mklabel "${LABEL}" -s -m
+./parted "${DEVI2}" mkpart "${ATP2}" -a optimal -s -m "${A2}%"  "${AUP2}%"
+./parted "${DEVI2}" mkpart "${BTP2}" -a optimal -s -m "${B2}%"  "${BUP2}%"
+./parted "${DEVI2}" mkpart "${CTP2}" -a optimal -s -m "${C2}%"  "${CUP2}%"
+./parted "${DEVI2}" mkpart "${DTP2}" -a optimal -s -m "${D2}%"  "${ENDD2}%"
+fi
+
+# partition device 3
+if [ "$EXPAND3" = "YES" ] ; then
+./parted "${DEVI3}" mklabel "${LABEL}" -s -m
+./parted "${DEVI3}" mkpart "${ATP3}" -a optimal -s -m "${A3}%"  "${AUP3}%"
+./parted "${DEVI3}" mkpart "${BTP3}" -a optimal -s -m "${B3}%"  "${BUP3}%"
+./parted "${DEVI3}" mkpart "${CTP3}" -a optimal -s -m "${C3}%"  "${CUP3}%"
+./parted "${DEVI3}" mkpart "${DTP3}" -a optimal -s -m "${D3}%"  "${ENDD3}%"
+fi
+
+
+# set boot flag 
+
+BFLG="$(echo ${BOOTDEV1} | grep -o [1-9] )"
+BOOTDEV="$(echo ${BOOTDEV1} | grep -o /....... )"
+echo "$BFLG" >bootfile
+echo "$BOOTDEV" >>bootfile
+./parted "${BOOTDEV}" set "${BFLG}" boot on 
+
+}
+
+format()
+{
+# a link to make swap behave more like mkfs 
+if ! [ -e /sbin/mkfs.swap ]
+then ln /sbin/mkswap /sbin/mkfs.swap
+     LINK1="/sbin/mkfs.swap"
+fi
+
+
+"mkfs.${AFS1}"  "${DEVI1}1" 
+"mkfs.${BFS1}"  "${DEVI1}2"
+"mkfs.${CFS1}"  "${DEVI1}3"
+"mkfs.${DFS1}"  "${DEVI1}4"
+
+if [ "$EXPAND2" = "YES" ] ; then
+"mkfs.${AFS2}"  "${DEVI2}1"
+"mkfs.${BFS2}"  "${DEVI2}2"
+"mkfs.${CFS2}"  "${DEVI2}3"
+"mkfs.${DFS2}"  "${DEVI2}4"
+fi
+
+if [ "$EXPAND3" = "YES" ] ; then
+"mkfs.${AFS3}"  "${DEVI3}1"
+"mkfs.${BFS3}"  "${DEVI3}2"
+"mkfs.${CFS3}"  "${DEVI3}3"
+"mkfs.${DFS3}"  "${DEVI3}4"
+fi
+
+rm "${LINK1}"
+
+}
+
+
+
+
+
+mountall()
+{
+# mount all partitions
+# stubbed
+# these should probably use the ${p(n)} parameters 
+# but for now "${DEVI1}(n)" should work
+mkdir -p "${BILD}"
+mkdir -p "${BILD}${AMT1}" 
+mount "${DEVI1}1" "${BILD}${AMT1}" 
+
+mkdir -p "${BILD}${BMT1}"
+mount "${DEVI1}2" "${BILD}${BMT1}" 
+
+mkdir -p "${BILD}${CMT1}" 
+mount "${DEVI1}3" "${BILD}${CMT1}" 
+
+mkdir -p "${BILD}${DMT1}"
+mount "${DEVI1}4" "${BILD}${CMT1}" 
+
+
+
+if [ "$EXPAND2" = "YES" ] ; then
+mkdir -p "${BILD}${AMT2}"
+mount "${DEVI2}1" "${BILD}${CMT2}"
+
+mkdir -p "${BILD}${BMT2}"
+mount "${DEVI2}2" "${BILD}${BMT2}"
+
+mkdir -p "${BILD}${CMT2}"
+mount "${DEVI2}3" "${BILD}${CMT2}"
+
+mkdir -p "${BILD}${DMT2}"
+mount "${DEVI2}4" "${BILD}${CMT2}" 
+fi
+
+
+
+if [ "$EXPAND3" = "YES" ] ; then
+mkdir -p "${BILD}${AMT3}"
+mkdir -p "${BILD}${BMT3}"
+mkdir -p "${BILD}${CMT3}"
+mkdir -p "${BILD}${DMT3}"
+
+mount "${DEVI3}1" "${BILD}${CMT3}"
+mount "${DEVI3}2" "${BILD}${BMT3}"
+mount "${DEVI3}3" "${BILD}${CMT3}"
+mount "${DEVI3}4" "${BILD}${CMT3}"
+fi
+
+}
+copykern(){
+mkdir -p "${BILD}"/boot
+cp "${KERN}" "${BILD}"/boot
+}
+copybusybox(){
+mkdir -p "${BILD}"/bin
+cp "${BBBOX}" "${BILD}"/bin/busybox
+cd "${BILD}"/bin
+./busybox --install .
+cd "${WORKD}"
+}
+
+
+bootloader_syslinux()
+{
+mkdir -p "${BILD}/boot"
+extlinux --install "${BILD}"/boot
+cp /usr/lib/syslinux/menu.c32 "${BILD}"/boot
+
+cat > "${BILD}"/boot/extlinux.conf <<EOF
+UI menu.c32                      
+DEFAULT linux                        
+LABEL ${DISTRO}-linux rescue shell
+  LINUX /boot/${KNAME}
+  APPEND root=/dev/sda1  init=/bin/sh
+EOF
+}
+
+
+
+
+unmountall()
+{ 
+umount "${DEVI1}4"
+umount "${DEVI1}3"
+umount "${DEVI1}2"
+umount "${DEVI1}1" 
+
+if [ "$EXPAND2" = "YES" ] ; then 
+umount "${DEVI2}4" 
+umount "${DEVI2}3"
+umount "${DEVI2}2"
+umount "${DEVI2}1" 
+fi 
+
+if [ "$EXPAND3" = "YES" ] ; then
+umount "${DEVI3}4" 
+umount "${DEVI3}3"
+umount "${DEVI3}2"
+umount "${DEVI3}1" 
+fi
+}
+
+main(){
+sequence   #0
+partedpart #1
+format     #2
+mountall   #3
+copykern   #4
+copybusybox #5
+bootloader_syslinux #6
+unmountall #7
+}
+
+main
+
+
+
+

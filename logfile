@@ -1,0 +1,40 @@
+execve("/usr/bin/nproc", ["nproc"], [/* 22 vars */]) = 0
+brk(0)                                  = 0x1ded000
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0fa9c4f000
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+open("/etc/ld.so.cache", O_RDONLY)      = 4
+fstat(4, {st_mode=S_IFREG|0644, st_size=79820, ...}) = 0
+mmap(NULL, 79820, PROT_READ, MAP_PRIVATE, 4, 0) = 0x7f0fa9c3b000
+close(4)                                = 0
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+open("/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY) = 4
+read(4, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\300\357\1\0\0\0\0\0"..., 832) = 832
+fstat(4, {st_mode=S_IFREG|0755, st_size=1603600, ...}) = 0
+mmap(NULL, 3717176, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 4, 0) = 0x7f0fa96a6000
+mprotect(0x7f0fa9828000, 2097152, PROT_NONE) = 0
+mmap(0x7f0fa9a28000, 20480, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 4, 0x182000) = 0x7f0fa9a28000
+mmap(0x7f0fa9a2d000, 18488, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f0fa9a2d000
+close(4)                                = 0
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0fa9c3a000
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0fa9c39000
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0fa9c38000
+arch_prctl(ARCH_SET_FS, 0x7f0fa9c39700) = 0
+mprotect(0x7f0fa9a28000, 16384, PROT_READ) = 0
+mprotect(0x606000, 4096, PROT_READ)     = 0
+mprotect(0x7f0fa9c51000, 4096, PROT_READ) = 0
+munmap(0x7f0fa9c3b000, 79820)           = 0
+brk(0)                                  = 0x1ded000
+brk(0x1e0e000)                          = 0x1e0e000
+open("/usr/lib/locale/locale-archive", O_RDONLY) = 4
+fstat(4, {st_mode=S_IFREG|0644, st_size=1534672, ...}) = 0
+mmap(NULL, 1534672, PROT_READ, MAP_PRIVATE, 4, 0) = 0x7f0fa9ac1000
+close(4)                                = 0
+sched_getaffinity(0, 128, {f, 0, 0, 0, 0, 0, 0, 0}) = 64
+fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 2), ...}) = 0
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0fa9c4e000
+write(1, "4\n", 2)                      = 2
+close(1)                                = 0
+munmap(0x7f0fa9c4e000, 4096)            = 0
+close(2)                                = 0
+exit_group(0)                           = ?
