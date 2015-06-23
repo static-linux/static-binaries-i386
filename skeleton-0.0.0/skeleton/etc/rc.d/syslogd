@@ -1,9 +1,0 @@
-#!/bin/sh
-case $1 in
- start) /sbin/syslogd
-        ;;
-  stop) /sbin/killall syslogd
-        ;;
-     *) echo "syslogd [start|stop]"
-        ;;
-esac
